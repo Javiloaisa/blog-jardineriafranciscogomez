@@ -5,7 +5,8 @@ Blog automático de [jardineriafranciscogomez.com](https://jardineriafranciscogo
 ## Cómo funciona
 
 1. **Cada domingo** una tarea programada de Claude escribe las 2 entradas de la semana siguiente en `articulos/`, siguiendo `docs/redaccion.md` y los temas de `temas.json`, y las sube a `main`.
-2. **GitHub Actions** (`.github/workflows/publicar.yml`) valida los artículos y los manda a WordPress como **entradas programadas** para su fecha, con imagen destacada de Pexels y los campos de Yoast. Lo enviado queda apuntado en `publicados.json`.
+   Ese mismo día añade enlaces desde artículos anteriores hacia los que ya se han publicado (enlazado interno en los dos sentidos).
+2. **GitHub Actions** (`.github/workflows/publicar.yml`) valida los artículos (SEO, GEO y enlaces) y los manda a WordPress como **entradas programadas** para su fecha, con imagen destacada de Pexels, los campos de Yoast y datos estructurados FAQPage. Si un artículo ya enviado cambia en el repo, actualiza la entrada en WordPress sin tocar su fecha. Lo enviado queda apuntado en `publicados.json`.
 3. **Del domingo al martes** puedes revisarlas en WordPress → Entradas → *Programadas*. Si no las tocas, se publican solas.
 
 Cada mañana el workflow vuelve a pasar por si algo falló.

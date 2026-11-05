@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
-Publica en WordPress los artículos de articulos/ que todavía no estén en publicados.json.
+Sincroniza los artículos de articulos/ con WordPress.
 
-- Fecha futura  -> entrada programada (status=future) para esa fecha.
-- Fecha pasada  -> se publica en el momento.
-- Imagen destacada de Pexels (si hay PEXELS_API_KEY).
-- Título SEO, meta descripción y keyword de Yoast (requiere el snippet wordpress/yoast-rest-meta.php).
+- Artículo nuevo        -> crea la entrada: programada (status=future) si su fecha es futura,
+                           publicada si ya pasó.
+- Artículo modificado   -> actualiza la entrada existente (texto, título, extracto, Yoast, FAQ),
+                           sin tocar su fecha ni su estado. Así se añaden enlaces a artículos anteriores.
+- Sin imagen destacada  -> busca una en Pexels (si hay PEXELS_API_KEY).
+- Enlaces [ancla](articulo:slug) -> se convierten en la URL real del artículo.
+- Preguntas frecuentes  -> se guardan como datos estructurados FAQPage (los imprime el mu-plugin).
 
 Variables de entorno: WP_USER, WP_APP_PASSWORD, PEXELS_API_KEY (opcional), WP_URL (opcional).
 """
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import os
 import random
@@ -21,12 +25,14 @@ import sys
 import markdown
 import requests
 
-from articulos import RAIZ, SITE, errores_de, leer, rutas
+from articulos import RAIZ, RE_ENLACE_ARTICULO, SITE, cargar_todos, errores_de, preguntas_frecuentes
 
 ESTADO = RAIZ / "publicados.json"
 CATEGORIA = "Consejos de jardinería"
 WP_URL = os.getenv("WP_URL", SITE).rstrip("/")
 API = f"{WP_URL}/wp-json/wp/v2"
+PERMALINK = WP_URL + "/{slug}/"  # estructura de enlaces permanentes /%postname%/
+VERSION_FORMATO = "2"  # cambiarlo fuerza a reenviar todos los artículos
 
 resumen: list[str] = []
 
@@ -45,10 +51,7 @@ def escribir_resumen(lineas: list[str]) -> None:
 
 
 def cargar_estado() -> dict:
-    if ESTADO.exists():
-        e = json.loads(ESTADO.read_text(encoding="utf-8"))
-    else:
-        e = {}
+    e = json.loads(ESTADO.read_text(encoding="utf-8")) if ESTADO.exists() else {}
     e.setdefault("entradas", {})
     e.setdefault("fotos_usadas", [])
     return e
@@ -56,6 +59,31 @@ def cargar_estado() -> dict:
 
 def guardar_estado(e: dict) -> None:
     ESTADO.write_text(json.dumps(e, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def huella(ruta) -> str:
+    return hashlib.sha256((VERSION_FORMATO + ruta.read_text(encoding="utf-8")).encode()).hexdigest()[:16]
+
+
+def html_de(a: dict) -> str:
+    cuerpo = RE_ENLACE_ARTICULO.sub(lambda m: f"]({PERMALINK.format(slug=m.group(1))})", a["cuerpo"])
+    return markdown.markdown(cuerpo, extensions=["extra", "sane_lists"])
+
+
+def faq_schema(a: dict) -> str:
+    pares = preguntas_frecuentes(a["cuerpo"])
+    if not pares:
+        return ""
+    url = PERMALINK.format(slug=a["slug"])
+    return json.dumps({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "@id": f"{url}#faq",
+        "mainEntity": [
+            {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": r}}
+            for q, r in pares
+        ],
+    }, ensure_ascii=False)
 
 
 class WP:
@@ -78,10 +106,15 @@ class WP:
                 return c["id"]
         return self.ok(self.s.post(f"{API}/categories", json={"name": nombre}, timeout=30))["id"]
 
-    def existente(self, slug: str):
+    def por_slug(self, slug: str):
         r = self.ok(self.s.get(f"{API}/posts", params={
-            "slug": slug, "status": "publish,future,draft,pending,private", "_fields": "id,link,status"}, timeout=30))
+            "slug": slug, "status": "publish,future,draft,pending,private",
+            "_fields": "id,link,status,featured_media"}, timeout=30))
         return r[0] if r else None
+
+    def entrada(self, post_id: int):
+        r = self.s.get(f"{API}/posts/{post_id}", params={"context": "edit", "_fields": "id,link,status,featured_media"}, timeout=30)
+        return None if r.status_code == 404 else self.ok(r)
 
     def subir_imagen(self, datos: bytes, nombre: str, alt: str, pie: str) -> int:
         m = self.ok(self.s.post(f"{API}/media", data=datos, timeout=120, headers={
@@ -91,6 +124,9 @@ class WP:
 
     def crear(self, payload: dict) -> dict:
         return self.ok(self.s.post(f"{API}/posts", json=payload, timeout=60))
+
+    def actualizar(self, post_id: int, payload: dict) -> dict:
+        return self.ok(self.s.post(f"{API}/posts/{post_id}", json=payload, timeout=60))
 
 
 def foto_pexels(consulta: str, usadas: list[int]):
@@ -116,10 +152,23 @@ def main() -> None:
         salir("Faltan los secrets WP_USER y/o WP_APP_PASSWORD en el repositorio (Settings → Secrets → Actions).")
 
     estado = cargar_estado()
-    pendientes = [p for p in rutas() if p.name not in estado["entradas"]]
+    todos, errores_lectura = cargar_todos()
+    for err in errores_lectura:
+        print(f"::error::{err}")
+
+    hay_pexels = bool(os.getenv("PEXELS_API_KEY", "").strip())
+    pendientes = []
+    for a in todos.values():
+        ruta = RAIZ / "articulos" / a["archivo"]
+        reg = estado["entradas"].get(a["archivo"])
+        cambiado = not reg or reg.get("huella") != huella(ruta)
+        sin_imagen = reg and not reg.get("imagen") and hay_pexels
+        if cambiado or sin_imagen:
+            pendientes.append((a, ruta, reg))
+
     if not pendientes:
-        print("Nada que publicar")
-        escribir_resumen(["Nada que publicar: todos los artículos ya están en WordPress."])
+        print("Nada que publicar ni actualizar")
+        escribir_resumen(["Nada que publicar ni actualizar: WordPress está al día."])
         return
 
     wp = WP(usuario, clave)
@@ -131,63 +180,77 @@ def main() -> None:
     cat = wp.categoria(CATEGORIA)
     ahora = dt.datetime.now(dt.timezone.utc)
     fallos = 0
-    resumen.append("| Artículo | Estado | Fecha |\n|---|---|---|")
+    resumen.append("| Artículo | Acción | Estado | Fecha |\n|---|---|---|---|")
 
-    for ruta in pendientes:
+    for a, ruta, reg in sorted(pendientes, key=lambda x: x[0]["fecha_dt"]):
         try:
-            a = leer(ruta)
-            errores = errores_de(a)
+            errores = errores_de(a, todos)
             if errores:
                 raise ValueError("; ".join(errores))
 
-            previo = wp.existente(a["slug"])
-            if previo:
-                estado["entradas"][ruta.name] = {"post_id": previo["id"], "enlace": previo["link"],
-                                                 "estado": previo["status"], "fecha": a["fecha"]}
-                guardar_estado(estado)
-                resumen.append(f"| {a['titulo']} | ya existía ({previo['status']}) | {a['fecha']} |")
-                continue
-
             payload = {
                 "title": a["titulo"],
-                "slug": a["slug"],
-                "content": markdown.markdown(a["cuerpo"], extensions=["extra", "sane_lists"]),
+                "content": html_de(a),
                 "excerpt": a["extracto"],
                 "categories": [cat],
-                "comment_status": "closed",
                 "meta": {
                     "_yoast_wpseo_title": a["meta_titulo"],
                     "_yoast_wpseo_metadesc": a["meta_descripcion"],
                     "_yoast_wpseo_focuskw": a["keyword"],
+                    "_jfg_faq_schema": faq_schema(a),
                 },
             }
-            fecha_utc = a["fecha_dt"].astimezone(dt.timezone.utc)
-            if fecha_utc > ahora + dt.timedelta(minutes=10):
-                payload["status"] = "future"
-                payload["date_gmt"] = fecha_utc.strftime("%Y-%m-%dT%H:%M:%S")
+
+            existente = wp.entrada(reg["post_id"]) if reg else None
+            if not existente:
+                existente = wp.por_slug(a["slug"])
+
+            if not existente or not existente.get("featured_media"):
+                foto = foto_pexels(a["imagen_busqueda"], estado["fotos_usadas"])
+                if foto:
+                    payload["featured_media"] = wp.subir_imagen(foto["datos"], f"{a['slug']}.jpg", a["imagen_alt"], foto["pie"])
+                    estado["fotos_usadas"].append(foto["id"])
+
+            if existente:
+                post = wp.actualizar(existente["id"], payload)
+                accion = "actualizada"
             else:
-                payload["status"] = "publish"
+                payload.update({"slug": a["slug"], "comment_status": "closed"})
+                fecha_utc = a["fecha_dt"].astimezone(dt.timezone.utc)
+                if fecha_utc > ahora + dt.timedelta(minutes=10):
+                    payload["status"] = "future"
+                    payload["date_gmt"] = fecha_utc.strftime("%Y-%m-%dT%H:%M:%S")
+                else:
+                    payload["status"] = "publish"
+                post = wp.crear(payload)
+                accion = "creada"
 
-            foto = foto_pexels(a["imagen_busqueda"], estado["fotos_usadas"])
-            if foto:
-                payload["featured_media"] = wp.subir_imagen(foto["datos"], f"{a['slug']}.jpg", a["imagen_alt"], foto["pie"])
-                estado["fotos_usadas"].append(foto["id"])
+            meta = post.get("meta") or {}
+            if "_yoast_wpseo_metadesc" not in meta or "_jfg_faq_schema" not in meta:
+                print(f"::warning::{ruta.name}: WordPress no ha guardado los datos de Yoast/FAQ. ¿Está subido wordpress/yoast-rest-meta.php a mu-plugins?")
+                yoast_ok = False
+            else:
+                yoast_ok = True
 
-            post = wp.crear(payload)
-            if "_yoast_wpseo_metadesc" not in (post.get("meta") or {}):
-                print(f"::warning::{ruta.name}: Yoast no ha recibido los metadatos. ¿Está activo el snippet yoast-rest-meta?")
-            estado["entradas"][ruta.name] = {"post_id": post["id"], "enlace": post["link"],
-                                             "estado": post["status"], "fecha": a["fecha"]}
+            estado["entradas"][ruta.name] = {
+                "post_id": post["id"],
+                "enlace": PERMALINK.format(slug=a["slug"]),
+                "estado": post["status"],
+                "fecha": a["fecha"],
+                "imagen": bool(post.get("featured_media")),
+                # Si Yoast no recibió los datos, no se guarda la huella: se reintentará en la próxima ejecución
+                "huella": huella(ruta) if yoast_ok else "",
+            }
             guardar_estado(estado)
-            resumen.append(f"| [{a['titulo']}]({post['link']}) | {post['status']} | {a['fecha']} |")
-            print(f"{ruta.name}: {post['status']} (id {post['id']})")
+            resumen.append(f"| [{a['titulo']}]({PERMALINK.format(slug=a['slug'])}) | {accion} | {post['status']} | {a['fecha']} |")
+            print(f"{ruta.name}: {accion} ({post['status']}, id {post['id']})")
         except Exception as ex:  # noqa: BLE001
             fallos += 1
             print(f"::error::{ruta.name}: {ex}")
             motivo = re.sub(r"[|\n]", " ", str(ex))[:200]
-            resumen.append(f"| {ruta.name} | ERROR: {motivo} | |")
+            resumen.append(f"| {ruta.name} | ERROR: {motivo} | | |")
 
-    escribir_resumen(["## Publicación en WordPress", *resumen])
+    escribir_resumen(["## Sincronización con WordPress", *resumen])
     if fallos:
         sys.exit(1)
 
