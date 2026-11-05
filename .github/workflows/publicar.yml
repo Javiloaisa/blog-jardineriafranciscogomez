@@ -1,0 +1,52 @@
+name: Publicar en WordPress
+
+on:
+  push:
+    branches: [main]
+    paths: ["articulos/**", "scripts/**", ".github/workflows/publicar.yml"]
+  workflow_dispatch:
+  schedule:
+    # Repesca diaria por si algo falló (hora UTC)
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install requests pyyaml markdown
+
+      - name: Validar artículos
+        run: python scripts/validar.py
+
+      - name: Publicar en WordPress
+        env:
+          WP_USER: ${{ secrets.WP_USER }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python scripts/publicar.py
+
+      - name: Guardar registro de publicados
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain publicados.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add publicados.json
+            git commit -m "Registra entradas enviadas a WordPress"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
