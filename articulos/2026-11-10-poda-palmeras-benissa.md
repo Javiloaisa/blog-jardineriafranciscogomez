@@ -53,7 +53,7 @@ Para comprobarlo, mira la copa de lado: si tras la poda tiene forma redondeada, 
 
 Una poda bien hecha sigue más o menos este orden, sea cual sea la especie:
 
-1. **Revisar la palmera antes de empezar.** Que las hojas centrales estén derechas y sanas, sin agujeros en su base ni fibra masticada. Si algo es raro, primero hay que descartar el picudo.
+1. **Revisar la palmera antes de empezar.** Que las hojas centrales estén derechas y sanas, sin agujeros en su base ni fibra masticada. Si algo es raro, primero hay que descartar el picudo: repasa los [síntomas del picudo rojo en la palmera](articulo:sintomas-picudo-rojo) antes de cortar nada.
 2. **Desinfectar las herramientas.** Sierras y hachas pasan de una palmera a otra; limpiarlas evita contagiar hongos y plagas.
 3. **Cortar las hojas secas y caídas** cerca del tronco, con cortes limpios.
 4. **Retirar inflorescencias y racimos de dátiles**, que pesan, ensucian y atraen insectos.
