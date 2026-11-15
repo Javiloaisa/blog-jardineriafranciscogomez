@@ -3,10 +3,10 @@
     "2026-11-10-poda-palmeras-benissa.md": {
       "post_id": 10029,
       "enlace": "https://jardineriafranciscogomez.com/poda-palmeras-benissa/",
-      "estado": "future",
+      "estado": "publish",
       "fecha": "2026-11-10 09:00",
       "imagen": false,
-      "huella": "d423a962c13d1411"
+      "huella": "ffe386b6dd0177fb"
     },
     "2026-11-13-sintomas-picudo-rojo.md": {
       "post_id": 10030,
@@ -15,6 +15,22 @@
       "fecha": "2026-11-13 09:00",
       "imagen": false,
       "huella": "5b332735cc9bf380"
+    },
+    "2026-11-17-que-plantar-otono-jardin.md": {
+      "post_id": 10153,
+      "enlace": "https://jardineriafranciscogomez.com/que-plantar-otono-jardin/",
+      "estado": "future",
+      "fecha": "2026-11-17 09:00",
+      "imagen": false,
+      "huella": "64ad18bb4121a9c4"
+    },
+    "2026-11-20-jardines-comunidades-invierno.md": {
+      "post_id": 10154,
+      "enlace": "https://jardineriafranciscogomez.com/jardines-comunidades-invierno/",
+      "estado": "future",
+      "fecha": "2026-11-20 09:00",
+      "imagen": false,
+      "huella": "e68c45cd35dc42b2"
     }
   },
   "fotos_usadas": []
