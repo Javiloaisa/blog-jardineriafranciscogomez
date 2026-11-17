@@ -6,7 +6,8 @@ Sincroniza los artículos de articulos/ con WordPress.
                            publicada si ya pasó.
 - Artículo modificado   -> actualiza la entrada existente (texto, título, extracto, Yoast, FAQ),
                            sin tocar su fecha ni su estado. Así se añaden enlaces a artículos anteriores.
-- Sin imagen destacada  -> busca una en Pexels (si hay PEXELS_API_KEY).
+- Sin imagen destacada  -> busca una en Pexels (si hay PEXELS_API_KEY); si no, usa una foto real
+                           de la empresa ya subida a WordPress, según el servicio del tema.
 - Enlaces [ancla](articulo:slug) -> se convierten en la URL real del artículo.
 - Preguntas frecuentes  -> se guardan como datos estructurados FAQPage (los imprime el mu-plugin).
 
@@ -33,6 +34,19 @@ WP_URL = os.getenv("WP_URL", SITE).rstrip("/")
 API = f"{WP_URL}/wp-json/wp/v2"
 PERMALINK = WP_URL + "/{slug}/"  # estructura de enlaces permanentes /%postname%/
 VERSION_FORMATO = "2"  # cambiarlo fuerza a reenviar todos los artículos
+
+# Fotos reales de trabajos de la empresa, ya subidas a la biblioteca de medios de WordPress (id de adjunto).
+# Se usan como imagen destacada cuando no hay foto de Pexels. Clave = campo "servicio" de temas.json.
+FOTOS_PROPIAS = {
+    "poda": [10167, 10190],          # palmeras washingtonia podadas · retirada de restos de poda
+    "picudo": [10178],               # palmera revisada frente al picudo
+    "parcelas": [10179],             # acceso de vivienda limpio
+    "jardines": [10180],             # camino con seto de hiedra recortado
+    "comunidades": [10179, 10180],
+    "riego": [10180],
+    "construccion": [10180],
+}
+FOTOS_POR_DEFECTO = [10167, 10163]  # palmeras podadas · furgoneta de la empresa
 
 resumen: list[str] = []
 
@@ -146,6 +160,19 @@ def foto_pexels(consulta: str, usadas: list[int]):
     return None
 
 
+def servicio_de(a: dict) -> str:
+    for t in json.loads((RAIZ / "temas.json").read_text(encoding="utf-8")):
+        if t["id"] == a.get("tema"):
+            return t.get("servicio", "")
+    return ""
+
+
+def foto_propia(a: dict) -> int:
+    fotos = FOTOS_PROPIAS.get(servicio_de(a)) or FOTOS_POR_DEFECTO
+    n = int(hashlib.sha256(a["slug"].encode()).hexdigest(), 16)
+    return fotos[n % len(fotos)]
+
+
 def main() -> None:
     usuario, clave = os.getenv("WP_USER", "").strip(), os.getenv("WP_APP_PASSWORD", "").strip()
     if not usuario or not clave:
@@ -156,13 +183,12 @@ def main() -> None:
     for err in errores_lectura:
         print(f"::error::{err}")
 
-    hay_pexels = bool(os.getenv("PEXELS_API_KEY", "").strip())
     pendientes = []
     for a in todos.values():
         ruta = RAIZ / "articulos" / a["archivo"]
         reg = estado["entradas"].get(a["archivo"])
         cambiado = not reg or reg.get("huella") != huella(ruta)
-        sin_imagen = reg and not reg.get("imagen") and hay_pexels
+        sin_imagen = reg and not reg.get("imagen")
         if cambiado or sin_imagen:
             pendientes.append((a, ruta, reg))
 
@@ -210,6 +236,8 @@ def main() -> None:
                 if foto:
                     payload["featured_media"] = wp.subir_imagen(foto["datos"], f"{a['slug']}.jpg", a["imagen_alt"], foto["pie"])
                     estado["fotos_usadas"].append(foto["id"])
+                else:
+                    payload["featured_media"] = foto_propia(a)
 
             if existente:
                 post = wp.actualizar(existente["id"], payload)

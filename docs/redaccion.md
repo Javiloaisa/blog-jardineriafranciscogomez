@@ -4,15 +4,15 @@ Esta guía manda sobre cualquier otra idea del redactor. Nadie revisa los artíc
 
 ## La empresa
 
-**Jardinería Francisco Gómez**, empresa de jardinería de Benissa (Alicante). Trabaja en la Marina Alta: Benissa, Calpe, Moraira y Teulada.
+**Jardinería Francisco Gómez**, empresa de jardinería de Benissa (Alicante). Trabaja en la Marina Alta: Benissa, Calpe, Moraira, Teulada, Altea y Xaló. Lleva más de 30 años en la zona. **No hace mantenimiento de piscinas.**
 
 ### Páginas a las que se puede enlazar (no hay otras)
 
 | Clave | Página | URL |
 |---|---|---|
 | comunidades | Mantenimiento de comunidades | https://jardineriafranciscogomez.com/servicio/mantenimiento-de-comunidades/ |
-| jardines-piscinas | Mantenimiento de jardines y piscinas | https://jardineriafranciscogomez.com/servicio/mantenimiento-de-jardines-y-piscinas/ |
-| construccion | Construcción de jardines con rocallas, fuentes y césped | https://jardineriafranciscogomez.com/servicio/construccin-de-jardines-con-rocallas-fuentes-cesped/ |
+| jardines | Mantenimiento de jardines | https://jardineriafranciscogomez.com/servicio/mantenimiento-de-jardines/ |
+| construccion | Construcción de jardines con rocallas, fuentes y césped | https://jardineriafranciscogomez.com/servicio/construccion-de-jardines-con-rocallas-fuentes-cesped/ |
 | poda | Poda de árboles y palmeras | https://jardineriafranciscogomez.com/servicio/poda-de-arboles-y-palmeras/ |
 | picudo | Tratamiento del picudo rojo | https://jardineriafranciscogomez.com/servicio/tratamiento-del-picudo/ |
 | riego | Instalación de sistemas de riego | https://jardineriafranciscogomez.com/servicio/instalacion-de-sistemas-de-riego/ |
@@ -21,6 +21,7 @@ Esta guía manda sobre cualquier otra idea del redactor. Nadie revisa los artíc
 | (Calpe) | Jardinero en Calpe | https://jardineriafranciscogomez.com/jardinero-en-calpe/ |
 | (Moraira) | Jardinero en Moraira | https://jardineriafranciscogomez.com/jardinero-en-moraira/ |
 | | Todos los servicios | https://jardineriafranciscogomez.com/servicios/ |
+| | Trabajos realizados | https://jardineriafranciscogomez.com/proyectos/ |
 | | Contacto | https://jardineriafranciscogomez.com/contacto/ |
 | | WhatsApp | https://wa.me/34616779874 |
 
@@ -46,6 +47,8 @@ Propietarios de chalets y casas de la costa (muchos con segunda residencia o res
 - Citar estudios, estadísticas o porcentajes.
 - Enlaces externos (a otras webs): ninguno.
 - Repetir el tema, el enfoque o la keyword principal de un artículo ya escrito (mira todos los de `articulos/`).
+- Hablar de piscinas como un servicio de la empresa: Jardinería Francisco Gómez no mantiene ni limpia piscinas. Se puede mencionar una piscina como parte del jardín («no plantes un árbol pegado a la piscina»), nunca ofrecer su mantenimiento.
+- Usar como keyword principal el nombre de un servicio con un pueblo o una búsqueda de contratación («poda de palmeras en Benissa», «mantenimiento de comunidades», «tratamiento del picudo rojo», «limpieza de parcelas», «instalación de riego», «construcción de jardines»). Esas búsquedas son de las páginas de servicio; si el blog las usa, compite con ellas. El blog va a por búsquedas informativas: «cuándo…», «cómo…», «qué…», «síntomas…», «cada cuánto…».
 
 ## SEO
 
@@ -80,6 +83,14 @@ Con anclas descriptivas que digan de qué va la página enlazada (nunca «aquí�
 ### Enlaces de vuelta (cada semana)
 
 Cuando un artículo ya está publicado (su fecha ha pasado), se añade un enlace hacia él desde 1-2 artículos anteriores relacionados, en una frase donde encaje con naturalidad (no un bloque de «artículos relacionados»). Al guardar el cambio en el repo, el sistema actualiza esas entradas en WordPress. Nunca se enlaza a un artículo cuya fecha no ha llegado.
+
+## Zonas
+
+Reparte los artículos entre Benissa, Calpe, Moraira, Teulada, Altea y Xaló (el campo `zona` de `temas.json`). Moraira y Teulada tienen que salir con la misma frecuencia que Benissa y Calpe: nómbralas en el texto cuando el artículo sea de su zona y enlaza la página de Moraira.
+
+## Imagen destacada
+
+Todas las entradas llevan imagen destacada. Si no hay clave de Pexels o no encuentra foto, el publicador usa una foto real de la empresa según el servicio del tema (ver `FOTOS_PROPIAS` en `scripts/publicar.py`).
 
 ## Estructura
 

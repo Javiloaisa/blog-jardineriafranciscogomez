@@ -89,7 +89,7 @@ Como criterio práctico: riega en profundidad cuando los primeros centímetros d
 
 Unas cuantas aromáticas, un macizo de flores de temporada o un saco de bulbos los planta cualquiera con un poco de cuidado. No hace falta un profesional.
 
-Tiene más sentido contar con uno cuando se trata de rehacer una zona entera del jardín, plantar árboles de cierto tamaño, preparar un terreno pedregoso o con mucha pendiente, o combinar la plantación con rocallas, césped y riego. Si es tu caso, en Jardinería Francisco Gómez nos encargamos de la [construcción de jardines con rocallas, fuentes y césped](https://jardineriafranciscogomez.com/servicio/construccin-de-jardines-con-rocallas-fuentes-cesped/), y el otoño es buen momento para empezar.
+Tiene más sentido contar con uno cuando se trata de rehacer una zona entera del jardín, plantar árboles de cierto tamaño, preparar un terreno pedregoso o con mucha pendiente, o combinar la plantación con rocallas, césped y riego. Si es tu caso, en Jardinería Francisco Gómez nos encargamos de la [construcción de jardines con rocallas, fuentes y césped](https://jardineriafranciscogomez.com/servicio/construccion-de-jardines-con-rocallas-fuentes-cesped/), y el otoño es buen momento para empezar.
 
 ## Preguntas frecuentes
 

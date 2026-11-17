@@ -1,11 +1,11 @@
 ---
 tema: comunidades-invierno
 fecha: "2026-11-20 09:00"
-titulo: "Mantenimiento de jardines de comunidades en invierno: qué hacer"
+titulo: "El jardín de la comunidad en invierno: qué hacer y qué revisar"
 slug: jardines-comunidades-invierno
-meta_titulo: "Mantenimiento de jardines de comunidades en invierno"
-meta_descripcion: "Mantenimiento de jardines de comunidades en invierno: poda, arbolado, palmeras, riego y limpieza. Calendario y lista de tareas para administradores."
-keyword: mantenimiento de jardines de comunidades
+meta_titulo: "Jardín de comunidad en invierno: qué hacer y revisar"
+meta_descripcion: "El jardín de una comunidad en invierno: poda, arbolado, palmeras, riego y limpieza. Calendario y lista de tareas para administradores y presidentes."
+keyword: jardín de comunidad en invierno
 keywords_secundarias:
   - jardinería para comunidades de vecinos
   - tareas de jardín en invierno

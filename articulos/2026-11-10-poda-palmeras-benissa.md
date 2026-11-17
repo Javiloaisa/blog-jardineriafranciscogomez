@@ -1,11 +1,11 @@
 ---
 tema: poda-palmeras-invierno
 fecha: "2026-11-10 09:00"
-titulo: "Poda de palmeras en Benissa: cuándo hacerla y cómo"
+titulo: "Cuándo podar las palmeras: calendario y errores en la Marina Alta"
 slug: poda-palmeras-benissa
-meta_titulo: "Poda de palmeras en Benissa: cuándo hacerla"
-meta_descripcion: "La poda de palmeras en Benissa se hace mejor en invierno. Te contamos por qué, qué hojas quitar y qué errores evitar para no atraer al picudo rojo."
-keyword: poda de palmeras en Benissa
+meta_titulo: "Cuándo podar palmeras: calendario para la Marina Alta"
+meta_descripcion: "Cuándo podar palmeras en Benissa y la Marina Alta: por qué el invierno es la mejor época, qué hojas quitar y qué errores evitar con el picudo rojo."
+keyword: cuándo podar palmeras
 keywords_secundarias:
   - cuándo podar palmeras
   - poda de palmeras en invierno
