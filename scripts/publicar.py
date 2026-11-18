@@ -122,7 +122,11 @@ class WP:
     def ok(self, r: requests.Response):
         if r.status_code >= 400:
             raise RuntimeError(f"WordPress {r.status_code} en {r.request.method} {r.url}: {r.text[:400]}")
-        return r.json()
+        try:
+            return r.json()
+        except ValueError:
+            raise RuntimeError(f"WordPress no ha devuelto JSON ({r.status_code}, {r.headers.get('Content-Type')}) "
+                               f"en {r.request.method} {r.url}: {' '.join(r.text[:400].split())!r}") from None
 
     def yo(self):
         return self.ok(self.s.get(f"{API}/users/me", timeout=30))
