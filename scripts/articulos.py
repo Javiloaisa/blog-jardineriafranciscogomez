@@ -1,4 +1,4 @@
-"""Lectura y validación de los artículos de articulos/*.md."""
+"""Lectura y validación de los artículos de articulos/*.md (español) y articulos/en/*.md (inglés)."""
 from __future__ import annotations
 
 import datetime as dt
@@ -15,10 +15,11 @@ RAIZ = Path(__file__).resolve().parent.parent
 DIR_ARTICULOS = RAIZ / "articulos"
 TEMAS = RAIZ / "temas.json"
 SITE = "https://jardineriafranciscogomez.com"
+IDIOMAS = ("es", "en")
 
 CAMPOS = ["tema", "fecha", "titulo", "slug", "meta_titulo", "meta_descripcion",
           "keyword", "keywords_secundarias", "extracto", "imagen_busqueda", "imagen_alt"]
-DIAS_PUBLICACION = {1: "martes", 4: "viernes"}  # weekday() de Python
+DIAS_PUBLICACION = {"es": {1: "martes", 4: "viernes"}, "en": {3: "jueves"}}  # weekday() de Python
 HORA_PUBLICACION = (9, 0)
 
 # Enlaces internos a otros artículos del blog: [ancla](articulo:slug)
@@ -40,8 +41,49 @@ PAGINAS_PERMITIDAS = {
     f"{SITE}/servicio/instalacion-de-sistemas-de-riego/",
     f"{SITE}/servicio/limpieza-de-parcelas/",
 }
+PAGINAS_PERMITIDAS_EN = {
+    f"{SITE}/en/",
+    f"{SITE}/en/services/",
+    f"{SITE}/en/contact/",
+    f"{SITE}/en/about-us/",
+    f"{SITE}/en/projects/",
+    f"{SITE}/en/gardener-calpe/",
+    f"{SITE}/en/gardener-moraira/",
+    f"{SITE}/en/servicio/community-garden-maintenance/",
+    f"{SITE}/en/servicio/garden-maintenance/",
+    f"{SITE}/en/servicio/garden-design-and-landscaping/",
+    f"{SITE}/en/servicio/tree-and-palm-pruning/",
+    f"{SITE}/en/servicio/red-palm-weevil-treatment/",
+    f"{SITE}/en/servicio/irrigation-installation/",
+    f"{SITE}/en/servicio/land-clearing/",
+}
 WHATSAPP = "https://wa.me/34616779874"
 ANCLAS_PROHIBIDAS = {"aquí", "aqui", "este artículo", "este enlace", "pincha aquí", "haz clic aquí", "más información", "leer más"}
+ANCLAS_PROHIBIDAS_EN = {"here", "click here", "read more", "this article", "more information", "this link"}
+
+# Lo que cambia según el idioma del artículo
+POR_IDIOMA = {
+    "es": {
+        "dir": DIR_ARTICULOS,
+        "temas": TEMAS,
+        "paginas": PAGINAS_PERMITIDAS,
+        "servicio": f"{SITE}/servicio/",
+        "anclas": ANCLAS_PROHIBIDAS,
+        "faq": "Preguntas frecuentes",
+        "guia": "docs/redaccion.md",
+        "permalink": SITE + "/{slug}/",
+    },
+    "en": {
+        "dir": DIR_ARTICULOS / "en",
+        "temas": RAIZ / "temas_en.json",
+        "paginas": PAGINAS_PERMITIDAS_EN,
+        "servicio": f"{SITE}/en/servicio/",
+        "anclas": ANCLAS_PROHIBIDAS | ANCLAS_PROHIBIDAS_EN,
+        "faq": "Frequently asked questions",
+        "guia": "docs/writing-en.md",
+        "permalink": SITE + "/en/{slug}/",
+    },
+}
 
 
 def normalizar(texto: str) -> str:
@@ -58,6 +100,10 @@ def leer(path: Path) -> dict:
     meta = {k: (v.strip() if isinstance(v, str) else v) for k, v in meta.items()}
     meta["cuerpo"] = m.group(2).strip()
     meta["archivo"] = path.name
+    # Ruta relativa a articulos/ («2026-11-10-x.md» o «en/2026-12-03-x.md»): clave en publicados.json
+    meta["ruta"] = path.relative_to(DIR_ARTICULOS).as_posix()
+    meta["idioma_dir"] = "en" if path.parent == POR_IDIOMA["en"]["dir"] else "es"
+    meta["idioma"] = str(meta.get("idioma") or "es").strip()
     meta["fecha_dt"] = parse_fecha(meta.get("fecha"))
     return meta
 
@@ -71,16 +117,26 @@ def parse_fecha(valor) -> dt.datetime:
 
 
 def rutas() -> list[Path]:
-    return sorted(DIR_ARTICULOS.glob("*.md"))
+    return sorted(DIR_ARTICULOS.glob("*.md")) + sorted(POR_IDIOMA["en"]["dir"].glob("*.md"))
 
 
-def ids_temas() -> set[str]:
-    return {t["id"] for t in json.loads(TEMAS.read_text(encoding="utf-8"))}
+def temas(idioma: str = "es") -> list[dict]:
+    ruta = POR_IDIOMA[idioma]["temas"]
+    return json.loads(ruta.read_text(encoding="utf-8")) if ruta.exists() else []
 
 
-def preguntas_frecuentes(cuerpo: str) -> list[tuple[str, str]]:
-    """Pares (pregunta, respuesta) de la sección ## Preguntas frecuentes."""
-    m = re.search(r"^## Preguntas frecuentes\s*\n(.*?)(?=^## |\Z)", cuerpo, re.M | re.S)
+def ids_temas(idioma: str = "es") -> set[str]:
+    return {t["id"] for t in temas(idioma)}
+
+
+def permalink(a: dict) -> str:
+    return POR_IDIOMA[a.get("idioma", "es")]["permalink"].format(slug=a["slug"])
+
+
+def preguntas_frecuentes(cuerpo: str, idioma: str = "es") -> list[tuple[str, str]]:
+    """Pares (pregunta, respuesta) de la sección ## Preguntas frecuentes (en inglés, Frequently asked questions)."""
+    titulo = re.escape(POR_IDIOMA[idioma]["faq"])
+    m = re.search(rf"^## {titulo}\s*\n(.*?)(?=^## |\Z)", cuerpo, re.M | re.S)
     if not m:
         return []
     pares = []
@@ -106,9 +162,17 @@ def errores_de(a: dict, todos: dict[str, dict] | None = None) -> list[str]:
     if e:
         return e
 
+    idioma = a["idioma"]
+    if idioma not in IDIOMAS:
+        return [f"idioma «{idioma}» no válido (pon «en» o quítalo para español)"]
+    if idioma != a["idioma_dir"]:
+        return ["los artículos en inglés van en articulos/en/ con «idioma: en»; los de español, en articulos/ sin idioma"]
+    cfg = POR_IDIOMA[idioma]
+
     f = a["fecha_dt"]
-    if f.weekday() not in DIAS_PUBLICACION:
-        e.append(f"la fecha {f:%d/%m/%Y} no cae en martes ni viernes")
+    dias = DIAS_PUBLICACION[idioma]
+    if f.weekday() not in dias:
+        e.append(f"la fecha {f:%d/%m/%Y} no cae en {' ni '.join(dias.values())}")
     if (f.hour, f.minute) != HORA_PUBLICACION:
         e.append("la hora debe ser 09:00")
     esperado = f"{f:%Y-%m-%d}-{a['slug']}.md"
@@ -161,9 +225,9 @@ def errores_de(a: dict, todos: dict[str, dict] | None = None) -> list[str]:
     if not re.search(r"^(\d+\. |\| )", cuerpo, re.M):
         e.append("hace falta al menos una lista numerada o una tabla")
 
-    faq = preguntas_frecuentes(cuerpo)
+    faq = preguntas_frecuentes(cuerpo, idioma)
     if not 3 <= len(faq) <= 5:
-        e.append(f"«## Preguntas frecuentes» debe tener de 3 a 5 preguntas ### (tiene {len(faq)})")
+        e.append(f"«## {cfg['faq']}» debe tener de 3 a 5 preguntas ### (tiene {len(faq)})")
     for pregunta, _ in faq:
         if not pregunta.endswith("?"):
             e.append(f"la pregunta frecuente «{pregunta}» debe terminar en ?")
@@ -171,26 +235,28 @@ def errores_de(a: dict, todos: dict[str, dict] | None = None) -> list[str]:
     # --- Enlaces
     enlaces = RE_ENLACE.findall(cuerpo)
     for ancla, url in enlaces:
-        if normalizar(ancla).strip() in {normalizar(x).strip() for x in ANCLAS_PROHIBIDAS}:
+        if normalizar(ancla).strip() in {normalizar(x).strip() for x in cfg["anclas"]}:
             e.append(f"ancla poco descriptiva: «{ancla}»")
-        if url.startswith(SITE) and url not in PAGINAS_PERMITIDAS:
-            e.append(f"enlace interno desconocido: {url} (usa las URLs de docs/redaccion.md)")
+        if url.startswith(SITE) and url not in cfg["paginas"]:
+            e.append(f"enlace interno desconocido: {url} (usa las URLs de {cfg['guia']})")
         elif url.startswith("http") and not url.startswith(SITE) and url != WHATSAPP:
             e.append(f"enlace externo no permitido: {url}")
     urls = [u for _, u in enlaces]
-    if not any(u.startswith(f"{SITE}/servicio/") for u in urls):
+    if not any(u.startswith(cfg["servicio"]) for u in urls):
         e.append("falta el enlace a la página del servicio")
     if WHATSAPP not in urls:
         e.append("falta el enlace de WhatsApp en el cierre")
 
     if todos is not None:
-        anteriores = [x for x in todos.values() if x["fecha_dt"] < f]
+        anteriores = [x for x in todos.values() if x["fecha_dt"] < f and x["idioma"] == idioma]
         destinos = RE_ENLACE_ARTICULO.findall(cuerpo)
         ahora = dt.datetime.now(TZ)
         for slug in destinos:
             destino = todos.get(slug)
             if not destino:
                 e.append(f"enlace a un artículo que no existe: articulo:{slug}")
+            elif destino["idioma"] != idioma:
+                e.append(f"enlace a articulo:{slug}, que está en otro idioma (solo se enlazan artículos del mismo idioma)")
             elif slug == a["slug"]:
                 e.append("el artículo se enlaza a sí mismo")
             elif destino["fecha_dt"] >= f and destino["fecha_dt"] > ahora:
@@ -213,7 +279,7 @@ def cargar_todos() -> tuple[dict[str, dict], list[str]]:
             a = leer(p)
             clave = a.get("slug") or p.stem
             if clave in todos:
-                errores.append(f"{p.name}: slug repetido con {todos[clave]['archivo']}")
+                errores.append(f"{a['ruta']}: slug repetido con {todos[clave]['ruta']}")
                 continue
             todos[clave] = a
         except Exception as ex:  # noqa: BLE001
@@ -223,16 +289,19 @@ def cargar_todos() -> tuple[dict[str, dict], list[str]]:
 
 def validar_todos() -> tuple[list[dict], list[str]]:
     todos, errores = cargar_todos()
-    temas = ids_temas()
+    ids = {i: ids_temas(i) for i in IDIOMAS}
     vistos = {"slug": {}, "fecha": {}, "tema": {}}
     for a in todos.values():
         for err in errores_de(a, todos):
-            errores.append(f"{a['archivo']}: {err}")
-        if a.get("tema") and a["tema"] not in temas:
-            errores.append(f"{a['archivo']}: el tema «{a['tema']}» no está en temas.json")
+            errores.append(f"{a['ruta']}: {err}")
+        idioma = a["idioma"] if a["idioma"] in IDIOMAS else "es"
+        if a.get("tema") and a["tema"] not in ids[idioma]:
+            errores.append(f"{a['ruta']}: el tema «{a['tema']}» no está en {POR_IDIOMA[idioma]['temas'].name}")
         for campo in vistos:
             valor = a["fecha_dt"].date() if campo == "fecha" else a.get(campo)
+            if campo != "slug":  # fecha y tema, por idioma; el slug es único en todo WordPress
+                valor = (idioma, valor)
             if valor in vistos[campo]:
-                errores.append(f"{a['archivo']}: {campo} repetido con {vistos[campo][valor]}")
-            vistos[campo][valor] = a["archivo"]
+                errores.append(f"{a['ruta']}: {campo} repetido con {vistos[campo][valor]}")
+            vistos[campo][valor] = a["ruta"]
     return list(todos.values()), errores

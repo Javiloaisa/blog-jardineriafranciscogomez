@@ -10,6 +10,8 @@ Sincroniza los artículos de articulos/ con WordPress.
                            de la empresa ya subida a WordPress, según el servicio del tema.
 - Enlaces [ancla](articulo:slug) -> se convierten en la URL real del artículo.
 - Preguntas frecuentes  -> se guardan como datos estructurados FAQPage (los imprime el mu-plugin).
+- Artículos en inglés (articulos/en/) -> se envían con jfg_lang=en: el mu-plugin les pone el idioma
+                           inglés de Polylang y la categoría «Gardening tips». Enlace: /en/<slug>/.
 
 Variables de entorno: WP_USER, WP_APP_PASSWORD, PEXELS_API_KEY (opcional), WP_URL (opcional).
 """
@@ -26,13 +28,15 @@ import sys
 import markdown
 import requests
 
-from articulos import RAIZ, RE_ENLACE_ARTICULO, SITE, cargar_todos, errores_de, preguntas_frecuentes
+from articulos import (DIR_ARTICULOS, RAIZ, RE_ENLACE_ARTICULO, SITE, cargar_todos, errores_de,
+                       preguntas_frecuentes, temas)
 
 ESTADO = RAIZ / "publicados.json"
-CATEGORIA = "Consejos de jardinería"
+CATEGORIA = "Consejos de jardinería"  # la de inglés («Gardening tips») la asigna el mu-plugin
 WP_URL = os.getenv("WP_URL", SITE).rstrip("/")
 API = f"{WP_URL}/wp-json/wp/v2"
-PERMALINK = WP_URL + "/{slug}/"  # estructura de enlaces permanentes /%postname%/
+# Estructura de enlaces permanentes /%postname%/; Polylang pone /en/ delante en las entradas en inglés
+PERMALINKS = {"es": WP_URL + "/{slug}/", "en": WP_URL + "/en/{slug}/"}
 VERSION_FORMATO = "2"  # cambiarlo fuerza a reenviar todos los artículos
 
 # Fotos reales de trabajos de la empresa, ya subidas a la biblioteca de medios de WordPress (id de adjunto).
@@ -79,17 +83,23 @@ def huella(ruta) -> str:
     return hashlib.sha256((VERSION_FORMATO + ruta.read_text(encoding="utf-8")).encode()).hexdigest()[:16]
 
 
+def enlace(a: dict, slug: str | None = None) -> str:
+    """URL pública de un artículo (o de otro artículo del mismo idioma, por su slug)."""
+    return PERMALINKS[a["idioma"]].format(slug=slug or a["slug"])
+
+
 def html_de(a: dict) -> str:
-    cuerpo = RE_ENLACE_ARTICULO.sub(lambda m: f"]({PERMALINK.format(slug=m.group(1))})", a["cuerpo"])
+    # Los enlaces articulo:slug solo apuntan a artículos del mismo idioma (lo comprueba el validador)
+    cuerpo = RE_ENLACE_ARTICULO.sub(lambda m: f"]({enlace(a, m.group(1))})", a["cuerpo"])
     return markdown.markdown(cuerpo, extensions=["extra", "sane_lists"])
 
 
 def faq_schema(a: dict) -> str:
-    pares = preguntas_frecuentes(a["cuerpo"])
+    pares = preguntas_frecuentes(a["cuerpo"], a["idioma"])
     if not pares:
         return ""
-    url = PERMALINK.format(slug=a["slug"])
-    return json.dumps({
+    url = enlace(a)
+    datos = {
         "@context": "https://schema.org",
         "@type": "FAQPage",
         "@id": f"{url}#faq",
@@ -97,7 +107,10 @@ def faq_schema(a: dict) -> str:
             {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": r}}
             for q, r in pares
         ],
-    }, ensure_ascii=False)
+    }
+    if a["idioma"] == "en":
+        datos["inLanguage"] = "en-GB"
+    return json.dumps(datos, ensure_ascii=False)
 
 
 class WP:
@@ -161,7 +174,7 @@ def foto_pexels(consulta: str, usadas: list[int]):
 
 
 def servicio_de(a: dict) -> str:
-    for t in json.loads((RAIZ / "temas.json").read_text(encoding="utf-8")):
+    for t in temas(a["idioma"]):
         if t["id"] == a.get("tema"):
             return t.get("servicio", "")
     return ""
@@ -171,6 +184,27 @@ def foto_propia(a: dict) -> int:
     fotos = FOTOS_PROPIAS.get(servicio_de(a)) or FOTOS_POR_DEFECTO
     n = int(hashlib.sha256(a["slug"].encode()).hexdigest(), 16)
     return fotos[n % len(fotos)]
+
+
+def payload_de(a: dict, cat: int) -> dict:
+    """Campos de la entrada que se envían siempre (al crearla y al actualizarla)."""
+    payload = {
+        "title": a["titulo"],
+        "content": html_de(a),
+        "excerpt": a["extracto"],
+        "meta": {
+            "_yoast_wpseo_title": a["meta_titulo"],
+            "_yoast_wpseo_metadesc": a["meta_descripcion"],
+            "_yoast_wpseo_focuskw": a["keyword"],
+            "_jfg_faq_schema": faq_schema(a),
+        },
+    }
+    if a["idioma"] == "en":
+        # El mu-plugin pone el idioma de Polylang y la categoría «Gardening tips» (en inglés)
+        payload["jfg_lang"] = "en"
+    else:
+        payload["categories"] = [cat]
+    return payload
 
 
 def main() -> None:
@@ -185,8 +219,8 @@ def main() -> None:
 
     pendientes = []
     for a in todos.values():
-        ruta = RAIZ / "articulos" / a["archivo"]
-        reg = estado["entradas"].get(a["archivo"])
+        ruta = DIR_ARTICULOS / a["ruta"]
+        reg = estado["entradas"].get(a["ruta"])
         cambiado = not reg or reg.get("huella") != huella(ruta)
         sin_imagen = reg and not reg.get("imagen")
         if cambiado or sin_imagen:
@@ -214,18 +248,7 @@ def main() -> None:
             if errores:
                 raise ValueError("; ".join(errores))
 
-            payload = {
-                "title": a["titulo"],
-                "content": html_de(a),
-                "excerpt": a["extracto"],
-                "categories": [cat],
-                "meta": {
-                    "_yoast_wpseo_title": a["meta_titulo"],
-                    "_yoast_wpseo_metadesc": a["meta_descripcion"],
-                    "_yoast_wpseo_focuskw": a["keyword"],
-                    "_jfg_faq_schema": faq_schema(a),
-                },
-            }
+            payload = payload_de(a, cat)
 
             existente = wp.entrada(reg["post_id"]) if reg else None
             if not existente:
@@ -254,15 +277,18 @@ def main() -> None:
                 accion = "creada"
 
             meta = post.get("meta") or {}
+            yoast_ok = True
             if "_yoast_wpseo_metadesc" not in meta or "_jfg_faq_schema" not in meta:
-                print(f"::warning::{ruta.name}: WordPress no ha guardado los datos de Yoast/FAQ. ¿Está subido wordpress/yoast-rest-meta.php a mu-plugins?")
+                print(f"::warning::{a['ruta']}: WordPress no ha guardado los datos de Yoast/FAQ. ¿Está subido wordpress/yoast-rest-meta.php a mu-plugins?")
                 yoast_ok = False
-            else:
-                yoast_ok = True
+            if a["idioma"] == "en" and post.get("jfg_lang") != "en":
+                print(f"::warning::{a['ruta']}: la entrada no ha quedado en inglés (jfg_lang={post.get('jfg_lang')!r}). "
+                      "¿Está subida la versión 3 de wordpress/yoast-rest-meta.php a mu-plugins y Polylang activo?")
+                yoast_ok = False
 
-            estado["entradas"][ruta.name] = {
+            estado["entradas"][a["ruta"]] = {
                 "post_id": post["id"],
-                "enlace": PERMALINK.format(slug=a["slug"]),
+                "enlace": enlace(a),
                 "estado": post["status"],
                 "fecha": a["fecha"],
                 "imagen": bool(post.get("featured_media")),
@@ -270,13 +296,13 @@ def main() -> None:
                 "huella": huella(ruta) if yoast_ok else "",
             }
             guardar_estado(estado)
-            resumen.append(f"| [{a['titulo']}]({PERMALINK.format(slug=a['slug'])}) | {accion} | {post['status']} | {a['fecha']} |")
-            print(f"{ruta.name}: {accion} ({post['status']}, id {post['id']})")
+            resumen.append(f"| [{a['titulo']}]({enlace(a)}) | {accion} | {post['status']} | {a['fecha']} |")
+            print(f"{a['ruta']}: {accion} ({post['status']}, id {post['id']})")
         except Exception as ex:  # noqa: BLE001
             fallos += 1
-            print(f"::error::{ruta.name}: {ex}")
+            print(f"::error::{a['ruta']}: {ex}")
             motivo = re.sub(r"[|\n]", " ", str(ex))[:200]
-            resumen.append(f"| {ruta.name} | ERROR: {motivo} | | |")
+            resumen.append(f"| {a['ruta']} | ERROR: {motivo} | | |")
 
     escribir_resumen(["## Sincronización con WordPress", *resumen])
     if fallos:
